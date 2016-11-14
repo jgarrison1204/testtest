@@ -404,17 +404,15 @@ var resizePizzas = function(size) {
 
   // Changes the value for the size of the pizza above the slider
   function changeSliderLabel(size) {
-    //Simplfied movement up and down DOM with selectors 
-    var pizzaSizeGetter = document.getElementById("pizzaSize");
     switch(size) {
       case "1":
-        pizzaSizeGetter.innerHTML = "Small";
+        document.getElementById("pizzaSize").innerHTML = "Small"; //'querySelector' is replaced w/ 'getElementByID'
         return;
       case "2":
-        pizzaSizeGetter.innerHTML = "Medium";
+        document.getElementById("pizzaSize").innerHTML = "Medium"; //'querySelector' is replaced w/ 'getElementByID'
         return;
       case "3":
-        pizzaSizeGetter.innerHTML = "Large";
+        document.getElementById("pizzaSize").innerHTML = "Large"; //'querySelector' is replaced w/ 'getElementByID'
         return;
       default:
         console.log("bug in changeSliderLabel");
@@ -423,38 +421,30 @@ var resizePizzas = function(size) {
 
   changeSliderLabel(size);
 
-   // Returns the size difference to change a pizza element from one size to another. Called by changePizzaSlices(size).
-  function determineDx (elem, size) {
-    var oldWidth = elem.offsetWidth;
-    var windowWidth = document.querySelector("#randomPizzas").offsetWidth;
-    var oldSize = oldWidth / windowWidth;
-
-    // Changes the slider value to a percent width
-    function sizeSwitcher (size) {
-      switch(size) {
-        case "1":
-          return 0.25;
-        case "2":
-          return 0.3333;
-        case "3":
-          return 0.5;
-        default:
-          console.log("bug in sizeSwitcher");
-      }
+   // This code is from Cameron's lecture: it changes the pizzas value to a % width
+  function changePizzaSizes (size) {
+    switch(size) {
+      case "1":
+        newWidth = 25;
+        break;
+      case "2":
+        newWidth = 33.3;
+        break;
+      case "3":
+        newWidth = 50;
+        break;
+      default:
+        console.log("bug in changePizzaSizes");
     }
 
-    var newSize = sizeSwitcher(size);
-    var dx = (newSize - oldSize) * windowWidth;
+    // This var is outside the foor loop so it doesn't repeat getting this element
+    // And also querySelectorAll is replaced by the getElementsByClassName to avoid scanning the whole DOM
+    var randomPizzas = document.getElementsByClassName("randomPizzaContainer");
 
-    return dx;
-  }
-
-  // Iterates through pizza elements on the page and changes their widths
-  function changePizzaSizes(size) {
-    for (var i = 0; i < document.querySelectorAll(".randomPizzaContainer").length; i++) {
-      var dx = determineDx(document.querySelectorAll(".randomPizzaContainer")[i], size);
-      var newwidth = (document.querySelectorAll(".randomPizzaContainer")[i].offsetWidth + dx) + 'px';
-      document.querySelectorAll(".randomPizzaContainer")[i].style.width = newwidth;
+    //Per reviewer's suggestion, it's more efficient to create var for array length, so that
+    //array's length property is not accessed to check its value at each iteration
+    for (var i = 0, len = randomPizzas.length; i < len; i++) {
+      randomPizzas[i].style.width = newWidth + "%";
     }
   }
 
@@ -470,8 +460,10 @@ var resizePizzas = function(size) {
 window.performance.mark("mark_start_generating"); // collect timing data
 
 // This for-loop actually creates and appends all of the pizzas when the page loads
+// Per reviewer's suggestion, took out the var 'pizzaDiv' from inside the loop, and
+// put it outside the loop so that it's not calling the DOM every loop iteration:
+var pizzasDiv = document.getElementById("randomPizzas");
 for (var i = 2; i < 100; i++) {
-  var pizzasDiv = document.getElementById("randomPizzas");
   pizzasDiv.appendChild(pizzaElementGenerator(i));
 }
 
@@ -499,13 +491,27 @@ function logAverageFrame(times) {   // times is the array of User Timing measure
 // https://www.igvita.com/slides/2012/devtools-tips-and-tricks/jank-demo.html
 
 // Moves the sliding background pizzas based on scroll position
+//This function caused FSL (forced synchronous layout) before refactoring:
+
+var items = document.getElementsByClassName('mover');
+
 function updatePositions() {
   frame++;
   window.performance.mark("mark_start_frame");
 
-  var items = document.querySelectorAll('.mover');
-  for (var i = 0; i < items.length; i++) {
-    var phase = Math.sin((document.body.scrollTop / 1250) + (i % 5));
+  // var items = document.getElementsByClassName('mover');
+
+  //This var calculates the scrollTop before the loop so that there is no query to the DOM each time the loop runs:
+  var scrollPosition = document.body.scrollTop / 1250;
+
+  // Per reviewer's suggestion, create var 'len' inside the loop initialization,
+  // as well as the var 'phase' -- mentioned it in the initialization of the loop
+  // to add efficiency:
+  for (var i = 0, len = items.length, phase; i < len; i++) {
+    //This line was causing 'forced reflow' bottleneck:
+    // var phase = Math.sin((document.body.scrollTop / 1250) + (i % 5));
+    //Replaced with this line with var scrollPosition that is now not part of this loop:
+    var phase = Math.sin((scrollPosition) + (i % 5));
     items[i].style.left = items[i].basicLeft + 100 * phase + 'px';
   }
 
@@ -526,7 +532,14 @@ window.addEventListener('scroll', updatePositions);
 document.addEventListener('DOMContentLoaded', function() {
   var cols = 8;
   var s = 256;
-  for (var i = 0; i < 200; i++) {
+  //Created this var before the loop to get rid of the querySelector in the loop:
+  var movingPizzas = document.getElementById('movingPizzas1');
+  // Per Karol's suggestion, to calculate # of pizza's per viewer's viewport:
+  var intViewportWidth = window.innerWidth;
+
+  // Per reviewer's suggestion, changed the number of sliding pizzas from 12 to 24;
+  // Also placed the var 'elem' in the loop initialization for efficiency
+  for (var i = 0, elem; i < 24; i++) {
     var elem = document.createElement('img');
     elem.className = 'mover';
     elem.src = "images/pizza.png";
@@ -534,7 +547,10 @@ document.addEventListener('DOMContentLoaded', function() {
     elem.style.width = "73.333px";
     elem.basicLeft = (i % cols) * s;
     elem.style.top = (Math.floor(i / cols) * s) + 'px';
-    document.querySelector("#movingPizzas1").appendChild(elem);
+    // The var movingPizzas before the loop improves this line be removing the query:
+    // document.querySelector("#movingPizzas1").appendChild(elem);
+    // The append is now updated without a query:
+    movingPizzas.appendChild(elem);
   }
   updatePositions();
 });
